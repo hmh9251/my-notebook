@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# Built binaries / executables
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.app
+
+# Dev database & data
+src-tauri/data/
+data/
+
+# Vite cache
+node_modules/.vite/
+
+# Tauri generated
+src-tauri/gen/schemas/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Env / local config
+.env
+.env.local
+*.local
+
+# User data (dev)
+src-tauri/jilu.json
