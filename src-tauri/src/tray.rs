@@ -1,4 +1,4 @@
-//! 系统托盘：关窗隐藏到托盘（保 MCP 在线），菜单「显示 / 退出」。
+//! 系统托盘：左键单击 → 显示窗口；右键 → 菜单（显示/退出）。
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -22,6 +22,7 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let _tray = TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .menu(&menu)
+        .menu_on_left_click(false) // 左键不弹菜单，只触发事件
         .tooltip("记录 — 本地笔记工具")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => {
@@ -36,6 +37,7 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
+            // 左键单击/连击 → 显示窗口（不弹菜单）
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 ..
