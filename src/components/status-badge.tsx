@@ -22,7 +22,14 @@ export function StatusBadge({ status, onCycle, className }: StatusBadgeProps) {
     <button
       type="button"
       disabled={!interactive}
-      onClick={onCycle ? () => onCycle() : undefined}
+      onClick={
+        onCycle
+          ? (e) => {
+              e.stopPropagation();
+              onCycle();
+            }
+          : undefined
+      }
       title={interactive ? `切换：${STATUS_LABEL[status]} → ${STATUS_LABEL[nextStatus(status)]}` : undefined}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs transition-opacity duration-150",

@@ -24,6 +24,26 @@ fn get_status_label(status: &str) -> &str {
     }
 }
 
+/// 主任务按状态折算进度百分比：已提测/已上线 → 100%，开发中 → 50%。
+/// 非 main 类型返回 None（用原类型标签）。
+fn main_progress(status: &str) -> Option<&'static str> {
+    match status {
+        "dev" => Some("50%"),
+        "testing" | "released" => Some("100%"),
+        _ => None,
+    }
+}
+
+/// 行内第二标签：主任务显示进度百分比，否则显示类型标签。
+fn progress_or_type(r#type: &str, status: &str) -> String {
+    if r#type == "main" {
+        if let Some(p) = main_progress(status) {
+            return p.to_string();
+        }
+    }
+    get_type_label(r#type).to_string()
+}
+
 /// 由 ISO 周次（YYYY-Www）算出该周周一~周日
 pub fn iso_week_dates(week_key: &str) -> Option<(NaiveDate, NaiveDate)> {
     let parts: Vec<&str> = week_key.split('-').collect();
@@ -90,7 +110,7 @@ pub fn generate_weekly_report(pool: &DbPool, week_key: &str) -> Result<String, B
             main_index,
             main_task.name,
             main_task.task_no,
-            get_type_label(&main_task.r#type),
+            progress_or_type(&main_task.r#type, &main_task.status),
             get_status_label(&main_task.status),
         ));
 
@@ -103,7 +123,7 @@ pub fn generate_weekly_report(pool: &DbPool, week_key: &str) -> Result<String, B
                     child_index,
                     child.name,
                     child.task_no,
-                    get_type_label(&child.r#type),
+                    progress_or_type(&child.r#type, &child.status),
                     get_status_label(&child.status),
                 ));
                 child_index += 1;
@@ -170,8 +190,33 @@ mod tests {
         assert!(!report.contains('|'));
         assert!(!report.contains("# 周报"));
         assert!(report.starts_with("周报 2026-W28（"));
-        assert!(report.contains("1. 用户登录优化（XXZX-29986，主任务，开发中）"));
+        // 主任务 dev → 50%；子任务仍显示类型标签
+        assert!(report.contains("1. 用户登录优化（XXZX-29986，50%，开发中）"));
         assert!(report.contains("1.1 校验逻辑（XXZX-29987，子任务，开发中）"));
+    }
+
+    #[test]
+    fn report_main_progress_by_status() {
+        let pool = tmp_pool();
+        let week = "2026-W28";
+        // dev → 50%
+        let mut t1 = new_task("登录页", "XXZX-1", week, None);
+        t1.status = "dev".into();
+        create_task(&pool, &t1).unwrap();
+        // testing → 100%
+        let mut t2 = new_task("下单流程", "XXZX-2", week, None);
+        t2.status = "testing".into();
+        create_task(&pool, &t2).unwrap();
+        // released → 100%
+        let mut t3 = new_task("支付回调", "XXZX-3", week, None);
+        t3.status = "released".into();
+        create_task(&pool, &t3).unwrap();
+
+        let report = generate_weekly_report(&pool, week).unwrap();
+        assert!(report.contains("1. 登录页（XXZX-1，50%，开发中）"));
+        assert!(report.contains("2. 下单流程（XXZX-2，100%，已提测）"));
+        assert!(report.contains("3. 支付回调（XXZX-3，100%，已上线）"));
+        assert!(!report.contains("主任务"));
     }
 
     #[test]

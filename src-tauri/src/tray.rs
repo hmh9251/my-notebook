@@ -22,7 +22,7 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let _tray = TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .menu(&menu)
-        .menu_on_left_click(false) // 左键不弹菜单，只触发事件
+        .show_menu_on_left_click(false) // 左键不弹菜单，只触发事件
         .tooltip("记录 — 本地笔记工具")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => {

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-shell";
-import { confirm } from "@tauri-apps/plugin-dialog";
 import {
   ArrowLeft,
   ExternalLink,
   Pencil,
+  RefreshCw,
   ChevronRight,
   Bug,
   GitBranch,
@@ -18,8 +18,9 @@ import {
   useTaskChildren,
   useUpdateTask,
   useUpdateTaskStatus,
-  useDeleteTask,
 } from "@/hooks/useWeekTasks";
+import { fetchJiraIssue } from "@/api/jira";
+import { buildContent } from "@/lib/jira-import";
 import { useUIStore } from "@/lib/stores/ui-store";
 import { useTaskTabs, type PreviewTab } from "@/lib/stores/task-tabs-store";
 import { StatusBadge } from "@/components/status-badge";
@@ -52,7 +53,7 @@ export function TaskDetail() {
   const { data: parent } = useTaskById(task?.parent_id ?? undefined);
   const updateTask = useUpdateTask();
   const updateTaskStatus = useUpdateTaskStatus();
-  const deleteTask = useDeleteTask();
+  const [updating, setUpdating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const tabs = useTaskTabs((s) =>
@@ -125,12 +126,35 @@ export function TaskDetail() {
     toast.success("已保存");
   };
 
-  const handleDelete = async () => {
-    const ok = await confirm(`确定删除任务「${task.name}」吗？`);
-    if (!ok) return;
-    await deleteTask.mutateAsync(task.id);
-    toast.success("已删除");
-    navigate("/");
+  // 重新从 Jira 拉取：刷新名称/分支/正文/链接，保留本地状态/排序/父子关系
+  const handleUpdateFromJira = async () => {
+    if (!task.task_no) {
+      toast.error("该任务没有任务号，无法从 Jira 更新");
+      return;
+    }
+    setUpdating(true);
+    try {
+      const issue = await fetchJiraIssue(task.task_no);
+      if (!issue.key) throw new Error("Jira 没返回该任务，检查任务号/令牌");
+      const form: NewTask = {
+        name: issue.summary || task.name,
+        link_url: `https://code.fastfish.com/browse/${issue.key}`,
+        task_no: issue.key,
+        branch: issue.branch,
+        status: task.status,
+        type: task.type,
+        parent_id: task.parent_id,
+        content: buildContent(issue),
+        week_key: task.week_key,
+        sort_order: task.sort_order,
+      };
+      await updateTask.mutateAsync({ id: task.id, task: form });
+      toast.success("已从 Jira 刷新");
+    } catch (e) {
+      toast.error(`更新失败：${e}`);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const goParent = () => {
@@ -206,12 +230,16 @@ export function TaskDetail() {
             <Pencil className="h-3 w-3" />
             编辑
           </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-destructive"
-          >
-            删除
-          </button>
+          {task.task_no && (
+            <button
+              onClick={() => void handleUpdateFromJira()}
+              disabled={updating}
+              className="flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-accent disabled:opacity-50"
+            >
+              <RefreshCw className={cn("h-3 w-3", updating && "animate-spin")} />
+              {updating ? "更新中…" : "更新"}
+            </button>
+          )}
         </div>
       </header>
 
