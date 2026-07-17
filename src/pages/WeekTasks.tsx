@@ -50,7 +50,10 @@ export function WeekTasks() {
   };
 
   const handleReorder = (orderedIds: number[]) => {
-    reorderTasks.mutate({ week_key: selectedWeek, ordered_ids: orderedIds });
+    reorderTasks.mutate(
+      { week_key: selectedWeek, ordered_ids: orderedIds },
+      { onError: (e) => toast.error(`排序保存失败：${e}`) },
+    );
   };
 
   const handleDelete = async (id: number) => {

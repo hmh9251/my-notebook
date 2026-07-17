@@ -80,6 +80,7 @@ export function TaskTableView({
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
     >
       {/* 表头 */}
       <div
@@ -120,7 +121,7 @@ export function TaskTableView({
         </div>
       </SortableContext>
 
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {activeTask ? (
           <div
             className={cn(GRID, "rounded-md border border-border bg-card shadow-lg")}

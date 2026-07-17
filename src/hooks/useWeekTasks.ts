@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/api/week_tasks";
-import type { NewTask } from "@/types/week_task";
+import type { NewTask, WeekTask } from "@/types/week_task";
 
 export function useTasksByWeek(week_key: string) {
   return useQuery({
@@ -83,7 +83,32 @@ export function useReorderTasks() {
   return useMutation({
     mutationFn: ({ week_key, ordered_ids }: { week_key: string; ordered_ids: number[] }) =>
       api.reorderTasks(week_key, ordered_ids),
-    onSuccess: (_, { week_key }) => {
+    onMutate: async ({ week_key, ordered_ids }) => {
+      const queryKey = ["tasks", week_key] as const;
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WeekTask[]>(queryKey);
+
+      queryClient.setQueryData<WeekTask[]>(queryKey, (current = []) => {
+        const byId = new Map(current.map((task) => [task.id, task]));
+        const orderedTopLevel = ordered_ids
+          .map((id, sortOrder) => {
+            const task = byId.get(id);
+            return task ? { ...task, sort_order: sortOrder } : null;
+          })
+          .filter((task): task is WeekTask => task !== null);
+        const orderedIdSet = new Set(ordered_ids);
+        const remaining = current.filter((task) => !orderedIdSet.has(task.id));
+        return [...orderedTopLevel, ...remaining];
+      });
+
+      return { previous, queryKey };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
+    onSettled: (_data, _error, { week_key }) => {
       queryClient.invalidateQueries({ queryKey: ["tasks", week_key] });
     },
   });
